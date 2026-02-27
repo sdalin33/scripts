@@ -9,25 +9,31 @@ import sounddevice as sd
 import soundfile as sf
 
 
-def record_audio(samplerate=16000):
-    """Record audio from microphone. Press Enter to stop."""
-    print("Recording... (press Enter to stop)")
-    frames = []
+def record_audio(duration=None, samplerate=16000):
+    """Record audio from microphone. Fixed duration or press Enter to stop."""
+    if duration:
+        print(f"Recording for {duration} seconds...")
+        audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype="float32")
+        sd.wait()
+        return audio, samplerate
+    else:
+        print("Recording... (press Enter to stop)")
+        frames = []
 
-    def callback(indata, frame_count, time_info, status):
-        frames.append(indata.copy())
+        def callback(indata, frame_count, time_info, status):
+            frames.append(indata.copy())
 
-    stream = sd.InputStream(samplerate=samplerate, channels=1, dtype="float32", callback=callback)
-    stream.start()
-    input()
-    stream.stop()
-    stream.close()
+        stream = sd.InputStream(samplerate=samplerate, channels=1, dtype="float32", callback=callback)
+        stream.start()
+        input()
+        stream.stop()
+        stream.close()
 
-    if not frames:
-        print("No audio recorded.")
-        sys.exit(1)
+        if not frames:
+            print("No audio recorded.")
+            sys.exit(1)
 
-    return np.concatenate(frames), samplerate
+        return np.concatenate(frames), samplerate
 
 
 def transcribe_local(audio, samplerate):
@@ -78,9 +84,10 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-l", "--local", action="store_true", help="Use Whisper (default)")
     group.add_argument("-c", "--cloud", action="store_true", help="Use ElevenLabs STT")
+    parser.add_argument("-d", "--duration", type=int, help="Record for N seconds (default: press Enter to stop)")
     args = parser.parse_args()
 
-    audio, sr = record_audio()
+    audio, sr = record_audio(duration=args.duration)
 
     if args.cloud:
         text = transcribe_cloud(audio, sr)
